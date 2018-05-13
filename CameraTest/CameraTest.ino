@@ -47,7 +47,7 @@ void loop() {
     medianFilter(data);
     gradientFilter(data, filteredData);
     int error = getError(filteredData);
-    int angle = PID(error, 1,0.01,5);
+    int angle = PID(error, 1,0,0);
     runServo(mid-angle);
   
     analogWrite(highPin,(int)(velocity-0.5*error));

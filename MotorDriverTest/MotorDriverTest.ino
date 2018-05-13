@@ -1,50 +1,154 @@
-/*
-  Analog input, analog output, serial output
-  Reads an analog input pin, maps the result to a range from 0 to 255 and uses
-  the result to set the pulse width modulation (PWM) of an output pin.
-  Also prints the results to the Serial Monitor.
-
-  The circuit:
-  - potentiometer connected to analog pin 0.
-    Center pin of the potentiometer goes to the analog pin.
-    side pins of the potentiometer go to +5V and ground
-  - LED connected from digital pin 9 to ground
-
-  created 29 Dec. 2008
-  modified 9 Apr 2012
-  by Tom Igoe
-
-  This example code is in the public domain.
-
-  http://www.arduino.cc/en/Tutorial/AnalogInOutSerial
-*/
 #include <Servo.h>
- 
-// These constants won't change. They're used to give names to the pins used:
+
+Servo myservo;
+const int SI = 3;
+const int CLK = 4;
+const int input = 0;
+const int mid = 83 ;
+const int servoPin = 9;
 const int highPin = 11;  // Analog input pin that the potentiometer is attached to
-const int lowPin = 10; // Analog output pin that the LED is attached to
-
-Servo servo;
-
-
+const int lowPin = 10; 
 void setup() {
-  // initialize serial communications at 9600 bps:
-  servo.attach(9);
-  servo.write(90);
-  Serial.begin(9600);
+  // put your setup code here, to run once:
+  pinMode(SI, OUTPUT);
+  pinMode(CLK, OUTPUT);
+  pinMode(highPin, OUTPUT);
+  pinMode(lowPin, OUTPUT);
+  myservo.attach(servoPin);
+  myservo.write(mid);
+
   Serial1.begin(9600);
+  Serial.begin(9600);
+  delay(3000);
 }
 
+int velocity = 60;
+int data[128];
+int filteredData[127];
+int prevError;
+double iError;
+boolean start = false;
 void loop() {
-   if(Serial1.available() > 0)      // Send data only when you receive data:
-   {
-      char data = Serial1.read();        //Read the incoming data & store into data
-      Serial.println(data);          //Print Value inside data in Serial monitor
-
-   }
-
-
-  // wait 2 milliseconds before the next loop for the analog-to-digital
-  // converter to settle after the last reading:
-  delay(10);
+  
+  if (Serial1.available() > 0) {
+    char data = Serial1.read();
+    if (data == 'a') {
+      start = true;
+    }
+    if (data == 'b') {
+      start = false;
+      prevError = 0;
+      iError = 0;
+    }
+  }
+  if (start) {
+    one_shot();
+  
+    medianFilter(data);
+    gradientFilter(data, filteredData);
+    int error = getError(filteredData);
+    int angle = PID(error, 1,0,0);
+    runServo(mid-angle);
+  
+    analogWrite(highPin,(int)(velocity-0.5*error));
+    digitalWrite(lowPin, LOW);
+  }
+  else {
+    myservo.write(mid);
+    digitalWrite(highPin, LOW);
+    digitalWrite(lowPin, HIGH);
+  }
 }
+
+void runServo(int degree) {
+  myservo.write(degree);
+}
+
+double PID(int error, double kp, double ki, double kd) {
+  int dError = error-prevError;
+  iError = iError + error;
+  prevError = error;
+  double angle = kp*error+ki*iError+kd*dError;
+  return angle;
+}
+void one_shot() {
+
+  // clear out data
+  digitalWrite(CLK, LOW);
+  digitalWrite(SI, HIGH);
+  digitalWrite(CLK, HIGH);
+  digitalWrite(SI, LOW);
+  digitalWrite(CLK, LOW);
+  // clear out
+  for(int i = 0; i < 128; i++) {
+    digitalWrite(CLK, HIGH);
+    digitalWrite(CLK, LOW);
+  }
+  
+  // Saturation time
+  delayMicroseconds(5000);
+  
+  // write data
+  digitalWrite(SI, HIGH);
+  digitalWrite(CLK, HIGH);
+  digitalWrite(SI, LOW);
+  digitalWrite(CLK, LOW);
+  for(int i = 0; i < 128; i++) {
+    delayMicroseconds(20);
+    int pixel=analogRead(input);
+    data[i] = pixel;
+    digitalWrite(CLK, HIGH);
+    digitalWrite(CLK, LOW);
+  }
+}
+void gradientFilter(int arr[], int newArr[]) {
+  for (int i = 0; i < 127; i++) {
+    newArr[i] = arr[i+1]-arr[i];
+  }
+}
+void medianFilter(int arr[]) {
+
+  int oldValue = arr[0];
+  for (int i = 0; i < 127; i++) {
+    int newValue = median(oldValue, arr[i], arr[i+1]);
+    oldValue = arr[i];
+    arr[i] = newValue;
+  }
+  arr[127]=median(oldValue, arr[127], arr[127]);
+}
+int getError(int arr[]) {
+  int maxIndex = 0;
+  int minIndex = 0;
+//  for (int i = 0; i < 127; i++) {
+//    Serial.println(output[i]);
+//  }
+  
+  for (int i = 0; i < 127; i++) {
+    if (arr[i]>arr[maxIndex]) {
+      maxIndex = i;
+    }
+    if (arr[i]<arr[minIndex]) {
+      minIndex = i;
+    }
+  }
+  int error = (maxIndex+minIndex)/2-64;
+  return error;
+}
+
+int median(int a, int b, int c) {
+  int x = max(a,b);
+  int y = max(a,c);
+  int z = max(b,c);
+  if(x==y) {
+    return z;
+  }
+  else if(x==z) {
+    return y;
+  }
+  else {
+    return x;
+  }
+}
+
+  
+
