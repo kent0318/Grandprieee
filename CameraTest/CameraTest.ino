@@ -28,17 +28,56 @@ int filteredData[127];
 int prevError;
 double iError;
 boolean start = false;
+
+double pval = 1.0;
+double ival = 0.01;
+double dval = 5.0;
+int currentState = 0;
+
 void loop() {
   
   if (Serial1.available() > 0) {
     char data = Serial1.read();
-    if (data == 'a') {
+    if (data == 'a' && start == false) {
       start = true;
     }
-    if (data == 'b') {
+    if (data == 'a' && start == true) {
       start = false;
       prevError = 0;
       iError = 0;
+    }
+    // only at stop you can adjust PID vals
+    if( start == false ) {
+      Serial1.print(pval);
+      Serial1.print(' ');
+      Serial1.print(ival);
+      Serial1.print(' ');
+      Serial1.println(dval);
+      switch(data) {
+        case 'p':
+          currentState = 1;
+          break;
+        case 'i':
+          currentState = 2;
+          break;
+        case 'd':
+          currentState = 3;
+          break;
+        case '1':
+          adjustPID(0.01);
+          break
+        case '2':
+          adjustPID(0.1);
+          break;
+        case '3';
+          adjustPID(-0.01);
+          break;
+        case '4';
+          adjustPID(-0.1);
+          break;
+        default:
+          break;
+      }
     }
   }
   if (start) {
@@ -47,7 +86,7 @@ void loop() {
     medianFilter(data);
     gradientFilter(data, filteredData);
     int error = getError(filteredData);
-    int angle = PID(error, 1,0.01,5);
+    int angle = PID(error, pval,ival,dval);
     runServo(mid-angle);
   
     analogWrite(highPin,(int)(velocity-0.5*error));
@@ -57,6 +96,16 @@ void loop() {
     myservo.write(mid);
     digitalWrite(highPin, LOW);
     digitalWrite(lowPin, HIGH);
+  }
+}
+
+void adjustPID(double value) {
+  if( currentState == 1 ) {
+    pval = pval + value;
+  } else if(currentState == 2) {
+    ival = ival + value;
+  } else if( currentState == 3) {
+    dval = dval + value;
   }
 }
 
