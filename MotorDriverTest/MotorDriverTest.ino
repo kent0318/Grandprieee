@@ -1,6 +1,5 @@
 /*
   Analog input, analog output, serial output
-
   Reads an analog input pin, maps the result to a range from 0 to 255 and uses
   the result to set the pulse width modulation (PWM) of an output pin.
   Also prints the results to the Serial Monitor.
@@ -19,31 +18,33 @@
 
   http://www.arduino.cc/en/Tutorial/AnalogInOutSerial
 */
-
+#include <Servo.h>
+ 
 // These constants won't change. They're used to give names to the pins used:
 const int highPin = 11;  // Analog input pin that the potentiometer is attached to
 const int lowPin = 10; // Analog output pin that the LED is attached to
 
+Servo servo;
 
 
 void setup() {
   // initialize serial communications at 9600 bps:
-  pinMode(highPin, OUTPUT);
-  pinMode(lowPin, OUTPUT);
+  servo.attach(9);
+  servo.write(90);
   Serial.begin(9600);
+  Serial1.begin(9600);
 }
 
 void loop() {
-  analogWrite(highPin, 255);
-  digitalWrite(lowPin, LOW);
-  delay(5000);
-  analogWrite(highPin, 128);
-  delay(5000);
-  digitalWrite(highPin, LOW);
-  digitalWrite(lowPin, HIGH);
+   if(Serial1.available() > 0)      // Send data only when you receive data:
+   {
+      char data = Serial1.read();        //Read the incoming data & store into data
+      Serial.println(data);          //Print Value inside data in Serial monitor
+
+   }
 
 
   // wait 2 milliseconds before the next loop for the analog-to-digital
   // converter to settle after the last reading:
-  delay(5000);
+  delay(10);
 }
